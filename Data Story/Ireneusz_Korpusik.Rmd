@@ -1,0 +1,410 @@
+---
+title: "Expensys of Polish municipalities budgets on education and upbringing in 2016"
+author: "Ireneusz Korpusik C00265954"
+date: "1/13/2021"
+output: 
+  word_document: default
+---
+
+```{r, include = FALSE}
+# installation (if necessary) and loading the packages
+if (!require(knitr)) install.packages("knitr")
+library(knitr)
+if (!require(ggplot2)) install.packages("ggplot2")
+library(ggplot2)
+if (!require(scales)) install.packages("scales")
+library(scales)
+if (!require(psych)) install.packages("psych")
+library(psych)
+if (!require(dplyr)) install.packages("dplyr")
+library(dplyr)
+if (!require(car)) install.packages("car")
+library(car)
+```
+
+#Introduction
+## Description of the problem
+
+Education is one of the most important tasks of the state, to which considerable public funds are allocated every year. It is an area where it is certainly not worth saving, because the level of prosperity in society depends on the way and quality of education. 
+
+The subject of this study is the per capita expenditure of the budgets of Polish municipalities in 2016 on education and upbringing.  In addition, we use information about the income of the budgets of these municipalities, including per capita. The choice of municipalities has been limited to the Małopolskie and Mazowieckie voivodeships only.
+
+The population of communes in Poland is, of course, finite (all the more so the population of the selected two voivodeships), but for the purposes of this project we treat it as an infinite population.
+
+
+## Aim of the study
+
+The aim of the study is to provide answers to the following questions:
+
+- what was the income of municipal budgets in 2016 and the amount of their expenses on education?
+
+- did the distribution of expenses vary depending on the province or type of municipality under consideration?
+
+- did average expenses differ significantly between urban, urban-rural and rural municipalities?
+
+- was there a significant relationship between income and spending?
+
+The study has been drawn up solely to satisfy one's own curiosity about the subject. If the results are made public, they may also be of interest to a wider audience, from education authorities to municipal authorities.
+
+## Statistical community
+
+The statistical community consists of Polish communes located in the Małopolskie and Mazowieckie voivodeships, the statistical unit is a single commune from these voivodeships
+
+## Statistical features
+
+- voivodship (in which the examined commune is located) - a quality feature expressed on a nominal scale with the following variants: Małopolskie, Mazowieckie,
+
+- type of commune - a quality feature expressed on a nominal scale with variants: urban, urban-rural, rural,
+
+- budget revenue per capita in PLN - continuous quantitative characteristic expressed on a quotient scale (auxiliary to the correlation and regression study),
+
+- spending of the budget per capita on education and upbringing in PLN - a continuous quantitative feature expressed on a quotient scale.
+
+## Statistical data
+
+The data comes from the website of the Central Statistical Office (GUS) (www.stat.gov.pl), from the Local Data Bank section, respectively:
+
+- category: Public finances, group: Revenue from the budgets of municipalities and cities with district rights, subgroup: Revenue per capita
+
+- category: Public finances, group: Expenditure of the budgets of municipalities and cities with district rights, subgroup: Expenditure per capita
+
+As a sample 100 municipalities were selected. In the proposal we assume a materiality level of 0.05.
+\newline
+```{r}
+# wojewodztwo - voivodship
+# gmina - municipality
+# dochody - revenue, income
+# wydatki - expenses
+# miejska - urban
+# wiejska - rural
+# miejsko-wiejska - urban-rural
+```
+
+```{r}
+# reading the data
+dane <- read.csv2("dane.csv")
+
+# displaying of first 10 lines 
+kable(head(dane, 10))
+```
+\newpage
+
+# Structure analysis
+
+We begin by analysing the structure of the variables under study
+
+## Voivodship
+
+We have a qualitative characteristic, we make a frequency table and a pie chart.
+\newline
+
+
+```{r}
+# auxiliary data frame for the variable Voivodship
+x <- dane$wojewodztwo
+tab1 <- as.data.frame(addmargins(table(x), FUN = sum)) # counts n
+tab1$pr <- round(as.numeric(addmargins(100*prop.table(table(x)), FUN = sum)), 2) # percentage %
+tab1$ods <- as.numeric(addmargins(prop.table(table(x)), FUN = sum)) # interest rate
+
+# frequency table to be displayed (without interest rate)
+kable(tab1[,1:3], col.names = c("Voivodship", "n", "%"))
+
+```
+
+In the surveyed group there were slightly more municipality from Mazowieckie voivodship, their share was 54% as compared to 46% of municipality from Małopolskie voivodship.
+\newline
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+# data frame for the chart (without the sum row)
+tab2 <- tab1[-nrow(tab1),]
+# pie chart
+ggplot(tab2, aes(x = "", y = ods, fill = x)) + 
+  geom_col(width = 1, colour = "black") + 
+  geom_text(aes(y = ods,  label = paste0(pr,"%")), size = 5, fontface = "bold", 
+            position = position_stack(vjust = 0.5))  +	  
+  scale_y_continuous(labels = scales::percent_format()) + 
+  coord_polar(theta = "y") + 
+  labs(fill = "Voivodship: ") + 
+  theme(legend.position = "bottom", legend.text = element_text(colour = "black", size = 12), 
+        axis.title.x = element_blank(), axis.title.y = element_blank(), 
+        axis.text.y = element_blank(), axis.ticks = element_blank())
+
+
+
+
+```
+
+## Type of municipality
+
+Type of municipality is also a qualitative variable, for the purposes of distinction we will use a bar chart
+\newline
+
+```{r}
+# auxiliary data frame for the Type of municipality variable
+x <- dane$gmina
+tab3 <- as.data.frame(addmargins(table(x), FUN = sum)) # counts n
+tab3$pr <- round(as.numeric(addmargins(100*prop.table(table(x)), FUN = sum)), 2) # percentage %
+tab3$ods <- as.numeric(addmargins(prop.table(table(x)), FUN = sum)) # interest rate
+
+# frequency table to be displayed (without interest rate)
+kable(tab3[,1:3], col.names = c("Rodzaj gminy", "n", "%"))
+```
+
+Urban-rural municipalities have the largest share in the sample, as much as 43%. Rural municipalities constitute 32% of all the investigated municipalities, and urban municipalities only 25%.
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+# data frame for the chart (without the sum row)
+tab4 <- tab3[-nrow(tab3),]
+
+# bar chart
+ggplot(tab4, aes(x = x, y = pr)) + 
+  geom_col(fill = "#FFFF99" , colour = "black") +
+  geom_text(aes(label = paste0(pr,"%")), stat = "identity", size = 5, 
+            fontface = "bold", position = position_stack(vjust = 0.5)) +
+  scale_x_discrete(labels = wrap_format(25)) +
+  ylim(NA, 1.2*max(tab4$pr)) +
+  theme(axis.title.x = element_blank(), axis.text.x = element_text(colour = "black", size = 12)) +
+  labs(y = "percentage")
+```
+
+## Budget revenues
+
+Revenue is a quantitative variable, we calculate the basic measures of distribution for it and produce a histogram.
+\newline
+
+```{r}
+kable(describe(dane$dochody, quant = c(0.25, 0.75))[c(3:5,8:12,14:15)], digits = 2)
+```
+
+The lowest observed amount of income per capita was PLN 2328.38, the highest as much as PLN 5338.39, which means a spread of results at the level of PLN 3010.01.
+
+The amount of revenue in individual communes differed from the arithmetic average by an average of PLN 423.80, which constitutes 14% of the average value in these communes. The variation is rather small.
+
+The distribution is characterized by extreme right asymmetry, it is also higher and slimmer than a normal distribution.
+\newline
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(dane, aes(x = dochody)) + 
+  geom_histogram(breaks=seq(2000, 5500, by = 500), colour = "black", fill = "#FFFF99") +
+  labs(x = "Income in PLN", y = "Number of observations") +
+  scale_x_continuous(breaks = seq(2000, 5500, by = 500))
+```
+
+We have an outlier observation (in this case the maximum value), which is the cause of very strong right asymmetry of the distribution. 
+
+We shall additionally check whether the mean income in the whole population differs significantly from 3000 PLN. We perform Student's t-test for one mean.
+\newline
+
+```{r}
+t.test(dane$dochody, alternative = "two.sided", mu = 3000, conf.level = 0.95)
+```
+
+The result of the test appeared to be statistically insignificant, $t(99)=-1,32,\; p=0,189$. This means that the average in the population is not significantly different from 3000 PLN per person.
+
+## Budget expenses for education
+
+We proceed here in exactly the same way as in the cases of income
+\newline
+
+```{r}
+kable(describe(dane$wydatki, quant = c(0.25, 0.75))[c(3:5,8:12,14:15)], digits = 2)
+```
+
+The average amount of budget expenditure per capita on education and upbringing was PLN 1103.58 in 2016 in the studied municipalities. In 25% of municipalities the amount of expenditure did not exceed PLN 998.62, in half of them it did not exceed PLN 1097.28, and in 75% of them it did not exceed PLN 1192.32. 
+
+The lowest observed amount of expenditure per capita was PLN 667.44, the highest as much as PLN 1625.47, which means a spread of results at the level of PLN 958.03.
+
+The amount of expenditure in individual communes differed from the arithmetic mean by 185.26 PLN on average, which is 17% of the average value in these communes. The variation is rather small.
+
+The distribution is characterized by moderate right asymmetry, it is also higher and slimmer than a normal distribution.
+
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(dane, aes(x = wydatki)) + 
+  geom_histogram(breaks=seq(600, 1700, by = 100), colour = "black", fill = "#FFFF99") +
+  labs(x = "Expenses in PLN", y = "Number of observations") +
+  scale_x_continuous(breaks = seq(600, 1700, by = 100))
+
+```
+
+Here the shape of the distribution is much more symmetrical (than in the income histogram), although compared to the normal distribution we have much more slenderness.
+
+We will additionally check whether the average expenditure in the whole population differs significantly from PLN 1000. We perform Student's t-test for one mean.
+\newline
+
+```{r}
+t.test(dane$wydatki, alternative = "two.sided", mu = 1000, conf.level = 0.95)
+```
+
+The result of the test appeared to be statistically significant, $t(99)=5,59,\; p<0,001$. This means that the population mean is significantly different from PLN 1000 per person. In this case, it is significantly higher than PLN 1000, with a probability of 0.95 (95% confidence) it belongs to the range of PLN 1066.82-1140.34.
+
+\newpage
+# Comparison of distributions
+
+We will make a comparison of the distribution of spending on education depending on the selected province and the type of municipality.
+
+## Voivodship breakdown
+
+```{r}
+tab5 <- dane %>%
+  group_by(wojewodztwo) %>%
+  summarise(mean = mean(wydatki), 
+            sd = sd(wydatki), 
+            median = median(wydatki), 
+            min = min(wydatki), 
+            max = max(wydatki),
+            skew = skew(wydatki),
+            kurtosis = kurtosi(wydatki),
+            Q1 = quantile(wydatki, 0.25),
+            Q3 = quantile(wydatki, 0.75))
+kable(tab5, digits = 2)
+```
+
+Values of all measures are similar in both provinces, the biggest differences concern only asymmetry and kurtosis, where higher values were found in Mazowieckie province.
+\newline
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(dane, aes(x = wydatki)) + 
+  geom_histogram(breaks=seq(600, 1700, by = 100), colour = "black", fill = "#FFFF99") +
+  facet_grid(wojewodztwo ~ .) +
+  labs(x = "Expenses in PLN", y = "Number of observations") +
+  scale_x_continuous(breaks = seq(600, 1700, by = 100))
+```
+
+Also in terms of shape there are no major differences between the considered voivodeships. We omit here performing a formal test comparing the averages.
+
+## Division by type of municipality
+
+```{r}
+tab6 <- dane %>%
+  group_by(gmina) %>%
+  summarise(mean = mean(wydatki), 
+            sd = sd(wydatki), 
+            median = median(wydatki), 
+            min = min(wydatki), 
+            max = max(wydatki),
+            skew = skew(wydatki),
+            kurtosis = kurtosi(wydatki),
+            Q1 = quantile(wydatki, 0.25),
+            Q3 = quantile(wydatki, 0.75)) %>% as.data.frame
+kable(tab6, digits = 2)
+```
+
+Here, the values of measures in groups are similar,too. perhaps noteworthy is only the high value of kurtosis in urban-rural municipalities.
+\newline
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(dane, aes(x = wydatki)) + 
+  geom_histogram(breaks=seq(600, 1700, by = 100), colour = "black", fill = "#FFFF99") +
+  facet_grid(gmina ~ .) +
+  labs(x = "Expenses in PLN", y = "Number of observations") +
+  scale_x_continuous(breaks = seq(600, 1700, by = 100))
+
+```
+
+We have clearly higher one "middle" bar in the group of urban-rural municipalities, which corresponds to a high value of kurtosis. The formal test comparing means in groups (analysis of variance) is given in the next chapter.
+
+\newpage
+# Analysis of interdependence of characteristics
+
+## Analysis of variance
+
+We will check whether average expenditure differed significantly in urban, urban-rural and rural municipalities. We will start by checking the condition of the variance homogeneity in groups. We will perform Levene's test.
+\newline
+
+```{r}
+leveneTest(dane$wydatki ~ dane$gmina)
+```
+
+The homogeneity condition is met, $F(2,97)=1,67,\; p=0,193$. To compare the averages within groups (types of municipalities) we can use parametric ANOVA.
+\newline
+
+```{r}
+model <- aov(wydatki ~ gmina, data = dane)
+summary(model)
+```
+
+The result of the test appeared to be statistically significant, $F(2,97)=3,63,\; p<0,05$. This means that at least two means are significantly different. To indicate different pairs of municipality types, an additional post-hoc test was performed.
+
+```{r}
+pairwise.t.test(dane$wydatki, dane$gmina, p.adj = "none")
+```
+
+Rural municipalities are significantly different from urban and urban-rural municipalities ($p<0,05$), however there is no substantial difference between urban and urban-rural municipalities ($p=0,824$).
+\newline
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(tab6, aes(x = gmina, y = mean)) + 
+  geom_col(fill = "#FFFF99" , colour = "black") +
+  geom_text(aes(label = round(mean, 2)), size = 5, fontface = "bold", 
+            position = position_stack(vjust = 0.5)) +
+  scale_x_discrete(labels = wrap_format(25)) +
+  ylim(NA, 1.2*max(tab6$mean)) +
+  theme(axis.title.x = element_blank(), axis.text.x = element_text(colour = "black", size = 12)) +
+  labs(y = "average")
+```
+
+The average spending on education in rural municipalities was found to be significantly higher than in the other two types of municipalities.
+
+## Correlation and regression
+
+Finally, we examine the relationship between the amount of income ($X$) and the amount of spending ($Y$) of municipal budgets. We examine the entire sample, without breaking it down by province or type of municipality. We will start with a visual assessment of the nature of this relationship, drawing up a scatter plot.
+\newline
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(dane, aes(x = dochody, y = wydatki)) + 
+  geom_point() + 
+  scale_y_continuous(expand = c(0.01, 0)) + 
+  xlab("Income") + 
+  ylab("Spendings")
+
+```
+
+We have one outlier observation on income, which was mentioned earlier. We will remove it, as it would significantly affect the regression line.
+\newline
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+# removing the observation from the outlier
+dane3 <- dane[dane$dochody<5000,]
+
+# scatter plot
+ggplot(dane3, aes(x = dochody, y = wydatki)) + 
+  geom_point() + 
+  stat_smooth(method = "lm", se = FALSE) + 
+  scale_y_continuous(expand = c(0.01, 0)) + 
+  xlab("Income") + 
+  ylab("Spendings") 
+
+```
+
+The pattern of points does not indicate the presence of any clear relationship.  We formally confirm this by calculating the Pearson linear correlation coefficient.
+\newline
+
+```{r}
+cor(dane3$dochody, dane3$wydatki)
+```
+
+There is only a moderate positive relationship between the variables ($r=0.45$).
+
+In this situation it makes no sense to consider regression models other than the linear model, which is the simplest functional model fitted to the data (the arrangement of points on the scatter plot itself does not suggest any non-linear relationship between the variables).
+\newline
+
+```{r}
+model2 <- lm(wydatki ~ dochody, data = dane3) 
+summary(model2)
+```
+
+The model after the estimation is in the form:  $y=0.24 ¯cdot x +411.57$.
+
+Budget income per capita greater by 1 PLN means expenditure on education greater by 0.24 PLN on average. The free expression of 411.57 has no meaningful interpretation (it is the theoretical amount of expenditure at zero income).
+
+The regression function explains the variation of expenditure with the variation of income only in 19.9%, the fit to the data is very weak. Estimating the amount of expenditure on the basis of the determined regression function we are wrong on average by 166.9 PLN.
+
+Both structural parameters of the model are statistically significant, as evidenced by values $p<0.05$
+
+
+# Summary
+
+There is a moderate positive correlation between the amount of spending and the amount of budget income per capita. From each additional PLN of income about 24 groszy (cents) was allocated to education. However, the fit of the linear model to the data was very poor.
+
+This study is not a complete survey, but it may be a good introduction to further, more in-depth analyses.

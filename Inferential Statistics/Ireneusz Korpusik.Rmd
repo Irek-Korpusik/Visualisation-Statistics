@@ -1,0 +1,922 @@
+---
+title: "Inferential"
+author: "Ireneusz Korpusik C00265954"
+date: "4/28/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Introduction
+
+Statistics is a study that deals with methods of obtaining and presenting, and most of all analysing data that describe mass events.  Statistics do not study single cases, single data, but as large a number of information as possible gathered and presented in such a way as to be able to draw conclusions that may be significant for the studied subject. The use of statistics in a research project is an opportunity to gain reliable data and correlations. The two main areas of statistics are usually referred to as descriptive statistics, which described the properties of the data from a sample and population, and inference statistics, which uses these characteristics to test hypotheses and draw propositions. Statistical tools and procedures are as follows:
+- Descriptive 
+- Mean (average)
+- Variance
+- Skewness
+- Kurtosis
+- Inferential
+- Linear regression analysis
+- Analysis of variance (ANOVA)
+- Logit/probit models
+- Null hypothesis testing
+
+## Hypothesis - premise or claim that we want to test
+
+## Research question
+- How many bikes were available between 01.01.2020 and 01.07.2020 ?
+Research question related explanation - were bicycles more common on the streets of Dublin, because of the pandemic situation.
+
+# Presentation of the dataset
+
+Urban bicycle hire systems have taken over in Europe. Bicycles are sometimes a fairly cheap way to get around town quickly, and the current pandemic has brought increased interest in bicycles. My dataset is a set of two datasets merged into one. The data covers period from 1 January 2020 to 1 July 2020 collected in Dublin City. They are available on https://data.smartdublin.ie/dataset/dublinbikes-api . They include data such as station number, street names, number of available bikes etc. There are 11 columns and over 11 million rows. The size of the collection is 1.2 GB. 
+To perform the analysis, I decided to use Logistic Regression. It is one of the regression methods belonging to the class of General Linear Models, used in situations where the dependent variable is measured on a nominal scale (usually a dichotomous variable), while the independent variables can be measured on nominal, ordinal (in both cases recoding to binary values is required) or quantitative scales.
+In logistic regression, unlike linear regression, the aim is not to predict the value of the dependent variable on the basis of the predictors used, but to predict the probability of an event occurring.
+
+
+### Variable column description
+
+```{r}
+library(ggplot2)
+library(tidyverse)  # data manipulation and visualization
+library(lubridate)
+library(dygraphs)
+library(dplyr)
+library(xts)
+library(caTools)
+library(ggside)
+library(tidyquant)
+```
+
+# Importing the dataset and combine into one
+
+```{r}
+df <- read.csv("dublinbikes_20200101_20200401.csv")
+df_1 <- read.csv("dublinbikes_20200401_20200701.csv")
+bike_sample = rbind(df,df_1)
+str(bike_sample)
+```
+
+
+
+```{r}
+head(bike_sample)
+```
+
+
+
+## Display summary of dataset
+```{r}
+summary(bike_sample)
+```
+##
+```{r}
+class(bike_sample$TIME)
+```
+
+
+
+```{r}
+hist(bike_sample$BIKE.STANDS, xlab = 'Available Bikes stands', ylab = 'Bikes', main = 'Bike Stands', col = 'green')
+```
+
+## Display how many 
+```{r}
+plot(bike_sample$AVAILABLE.BIKES, bike_sample$AVAILABLE.BIKE.STANDS, xlab= 'Available bikes', ylab = 'Bike Stands', main = 'Dublin Bikes', col = 'blue', pch = 16)
+```
+
+## Create new dataframe from previous dataframe
+
+```{r}
+bike_copy <- bike_sample
+```
+
+### Change the format of "TIME" from character to factor
+```{r}
+bike_copy$TIME <- as.POSIXct(strptime(bike_copy$TIME, "%Y-%m-%d %H:%M:%S", "GMT"))
+```
+
+###Display structure of the dataframe 
+```{r}
+str(bike_copy)
+```
+
+
+
+```{r}
+typeof(bike_copy)
+```
+## Display summary of dataset
+```{r}
+summary(bike_copy)
+```
+
+### Remove one of the column from dataset as I'm not going to use it
+
+```{r}
+bike_copy$LAST.UPDATED <- NULL
+```
+
+
+
+
+```{r}
+head(bike_copy)
+```
+
+
+### Convert character variables to factor
+```{r}
+bike_copy[sapply(bike_copy, is.character)] <- lapply(bike_copy[sapply(bike_copy, is.character)], as.factor)
+```
+
+
+
+```{r}
+str(bike_copy)
+```
+
+
+
+```{r}
+tail(bike_copy)
+```
+
+```{r}
+library(hrbrthemes)
+library(plotly)
+```
+
+
+```{r}
+time_bike <- bike_copy
+```
+
+
+```{r}
+tail(time_bike)
+```
+
+
+### convert "Station ID" from int to factor
+```{r}
+time_bike$STATION.ID <- as.factor(time_bike$STATION.ID)
+```
+
+
+```{r}
+tail(time_bike)
+```
+
+
+
+
+```{r}
+p <- ggplot(time_bike, aes(NAME, STATION.ID, color = BIKE.STANDS))
+p + geom_point()
+```
+
+```{r}
+head(time_bike)
+```
+
+```{r}
+time_bike2 <- time_bike
+```
+
+
+
+
+```{r}
+time_bike2 %>%
+ggplot(aes(x = NAME, y = STATION.ID, color = as.factor(BIKE.STANDS))) +
+  geom_point() +
+  geom_smooth(aes(color = NULL)) +
+  geom_xsideboxplot(
+    alpha = 0.5,
+    size = 1
+  ) +
+  scale_color_tq() +
+  scale_fill_tq() +
+  theme_tq() +
+  facet_grid(cols = vars(BIKE.STANDS), scales = "free_x") +
+  labs(
+    title = "How many bike_stands are available"
+  )
+```
+
+
+
+```{r}
+p <- ggplot(time_bike, aes(NAME, STATION.ID))
+p + geom_point(aes(colour = factor(BIKE.STANDS)))
+```
+
+```{r}
+?geom_histogram
+```
+
+
+```{r}
+head(time_bike)
+```
+
+
+
+
+```{r}
+?cut
+```
+
+```{r}
+Time_bin <- time_bike$TIME
+```
+
+
+### Cut data into "bins" and specify labels to every "cut" (these function is good when working on big datasets)
+```{r}
+cut(Time_bin,31)
+```
+
+
+
+
+```{r}
+time_bike_copy <- bike_copy
+```
+
+
+
+```{r}
+tail(time_bike_copy)
+```
+
+
+### Create new dataframe name from existing dataframe
+```{r}
+Station_number <- time_bike_copy$STATION.ID
+```
+
+
+```{r}
+cut(Station_number,100)
+```
+#### I was trying to use function "cut" which divide values in a range into called "buckets" or "bins", but it didn't really work good for me. 
+
+```{r}
+?hist
+```
+
+
+### Summarize distribution of "Station_number" ()
+```{r}
+hist(Station_number)
+```
+
+
+```{r}
+head(time_bike)
+```
+
+```{r}
+head(bike_sample)
+```
+
+
+### Display Density of "Latitude" 
+```{r}
+hist(bike_sample$LATITUDE, xlab = 'Latitude', ylab = 'Name', main = 'Bikes', col = 'red',
+     freq = F)
+```
+### Density of Available Bikes
+```{r}
+hist(bike_sample$AVAILABLE.BIKES, xlab = 'Available Bikes', ylab = 'Density', main = 'Bikes', col = 'green',
+     freq = F)
+```
+
+
+
+
+
+
+
+```{r}
+head(bike_copy)
+```
+
+
+
+
+
+
+
+
+
+## Research question
+- How many bikes were available in different months in 2020?
+Research question related explanation - were bicycles more common on the streets of Dublin, because of the pandemic last year?
+
+
+
+
+```{r}
+head(bike_copy)
+```
+
+
+
+### Display "TIME", "STATION.ID" less than 200 from January till July
+### As you can see people using bikes ( as per Station.Id) more often during May-July
+```{r}
+last_bike <- bike_copy %>%
+  filter(STATION.ID < 200) %>%
+  sample_n(300)
+ggplot(last_bike, aes(x = TIME, y = STATION.ID, size = TIME, color = TIME)) +
+  geom_point()
+  
+```
+
+
+
+
+
+
+
+```{r}
+head(bike_sample)
+```
+
+
+```{r}
+ggplot(bike_sample, aes(x = TIME, y = AVAILABLE.BIKES, fill = STATUS))+
+  geom_bar(stat = "identity")
+```
+
+
+
+
+
+
+### There is no "Close" in a "STATUS"
+```{r}
+ggplot(bike_sample, aes(x = TIME, y = AVAILABLE.BIKES, fill = STATUS))+
+  geom_bar(stat = "identity", position = "dodge")+
+  theme_bw()+
+  labs(title="Bikes available in specific time")+
+  facet_wrap(STATUS~.)
+```
+
+
+
+
+
+
+
+
+```{r}
+table(bike_sample$AVAILABLE.BIKES)
+```
+
+```{r}
+count <- table(bike_sample$AVAILABLE.BIKES)
+```
+
+
+### Table by "AVAILABLE.BIKES" divided by number of observations in dataframe
+```{r}
+table(bike_sample$AVAILABLE.BIKES)/5138878
+```
+
+
+
+```{r}
+barplot(count)
+```
+
+
+```{r}
+percent <- table(bike_sample$AVAILABLE.BIKES)/5138878
+```
+
+###Display percentage of "AVAILABLE.BIKES"
+```{r}
+barplot(percent, main = "Bikes", ylab = "AVAILABLE.BIKES", xlab = "%", las=1, horiz = T, col = "yellow")
+```
+
+
+
+
+
+
+```{r}
+tail(bike_copy)
+```
+
+###Display, count how many bikes, and group by "STATION.ID"
+```{r}
+bike_copy %>%
+group_by(STATION.ID)%>%
+summarise(count = n())
+```
+
+
+### Display dataframe "bike.CopY" grouped by "STATION.ID", counted and show as values on y 
+```{r}
+bike_CopY <- bike_copy %>%
+  group_by(STATION.ID) %>%
+  summarise(count = n(), .groups = 'drop') %>% ggplot( aes(x=STATION.ID, y=count)) +
+  geom_bar(stat="identity")
+
+```
+
+
+
+```{r}
+
+bike_CopY
+
+```
+
+
+### New name of the dataframe
+```{r}
+split_date <- bike_copy
+```
+
+
+### Print dataframe
+```{r}
+split_date
+```
+
+
+###Display only columns which are listed
+```{r}
+split_date %>%
+  select(TIME, BIKE.STANDS, AVAILABLE.BIKES)
+```
+
+
+
+
+
+###When I tried to draw two graphs, got an error regarding out of memory
+
+### I used only geom_smooth to display line which shows how many were available bikes and bike stands
+```{r}
+ggplot(split_date, aes(x=BIKE.STANDS, y=AVAILABLE.BIKES)) + 
+  geom_smooth()
+```
+
+
+
+
+```{r}
+bike_split_time <- bike_sample
+```
+
+
+
+
+```{r}
+bike_split_time
+```
+### Convert "TIME" column to factor 
+```{r}
+bike_split_time$TIME <- as.POSIXct(strptime(bike_split_time$TIME, "%Y-%m-%d %H:%M:%S", "GMT"))
+```
+
+
+```{r}
+bike_split_time
+```
+
+
+
+```{r}
+bike_split_time$Date <- date(bike_split_time$TIME)
+```
+
+
+```{r}
+head(bike_split_time)
+```
+
+
+## Research question
+- How many bikes were available in  months January to July in 2020?
+Research question related explanation - were bicycles more common on the streets of Dublin, because of the pandemic last year?
+
+
+### In which month people used bikes more than in other months????
+```{r}
+bike_split_time %>% 
+  group_by(month(bike_split_time$TIME),
+                             year(bike_split_time$TIME)) %>% 
+  summarise(count = n())
+```
+
+
+
+
+
+##### where, when and between (2020-01-01 and 2020-02-10) in one month people used the most bikes just only on one road "Blessington Street". It shows how many bikes in one month was available, how many bike stands were available 
+```{r}
+filter(bike_split_time, ADDRESS == "Blessington Street" & AVAILABLE.BIKES > 0 & between(Date, as.Date("2020-01-01"), as.Date("2020-02-10")))
+```
+
+```{r}
+bike_filter <- filter(bike_split_time, ADDRESS == "Blessington Street" & AVAILABLE.BIKES > 0)
+bike_filter
+```
+### filter by only two Addresses
+```{r}
+bike_filter1 <- filter(bike_split_time, ADDRESS %in% c("Blessington Street", "Hanover Quay East"))
+bike_filter1
+```
+###Visu for above
+
+
+
+
+
+
+
+
+```{r}
+bike_split_time %>% 
+  group_by(month(bike_split_time$TIME), year(bike_split_time$TIME)) %>% 
+  summarise(Avl_bikes = max(bike_split_time$AVAILABLE.BIKES))
+```
+
+
+### available bikes will be aggregate based on  address
+
+```{r}
+aggregate(AVAILABLE.BIKES ~ ADDRESS, bike_split_time, sum)
+```
+
+
+
+
+### filter all available bikes which are 10 
+
+
+```{r}
+filter(bike_split_time, AVAILABLE.BIKES == 10, AVAILABLE.BIKE.STANDS == 10, BIKE.STANDS <=20, NAME == "ECCLES STREET")
+```
+
+
+
+
+
+#### Randomly select 1% of all observations
+
+```{r}
+sample_frac(bike_split_time, 0.01)
+```
+
+```{r}
+top_n(bike_split_time, 2, -BIKE.STANDS)
+```
+### group by address and count
+
+```{r}
+top_10_add <- bike_split_time %>% 
+  group_by(ADDRESS) %>%
+  summarise(count_entries = n())%>%
+  arrange(desc(count_entries))%>%
+  head(10)
+top_10_add
+```
+### Result from previous chunk of code use top_n
+
+```{r}
+top_10_add <- head(top_10_add, 10)
+top_10_add
+```
+
+
+
+
+### Group by "Address", summarise "count_entries" in Descending order
+```{r}
+top_10_add %>%
+  group_by(ADDRESS) %>%
+  tally(count_entries) %>%
+  arrange(desc(n))
+```
+
+
+
+
+### Display previous calculation
+```{r}
+top_10_add %>%
+  ggplot() + geom_bar(aes(x = ADDRESS, weight = count_entries), fill = "#AC3C12")
+```
+
+
+
+```{r}
+head(top_10_add)
+```
+
+
+### Plot which "Address" has the specific value
+```{r}
+ggplot(top_10_add, aes(x=ADDRESS, y=count_entries, group = 1)) + 
+  geom_line() +
+geom_point() 
+
+```
+
+### Level of the color came from the value of the "Address" column
+```{r}
+ggplot(top_10_add, aes(x=ADDRESS, y=count_entries, group = 1)) +
+geom_density2d_filled()
+```
+
+## Multiple Linear Regression
+
+
+```{r}
+?lm
+```
+
+
+```{r}
+head(bike_filter)
+```
+
+
+
+
+#### Create new dataframe with selected columns from existing dataframe
+
+```{r}
+model1 <- bike_split_time[,c(5,6,7)]
+head(model1)
+```
+
+
+#Linear multiple regression
+#### Plot your data
+
+```{r}
+plot(model1)
+```
+
+```{r}
+tail(model1)
+```
+
+
+```{r}
+multiple.regression <- lm(BIKE.STANDS ~ AVAILABLE.BIKE.STANDS + AVAILABLE.BIKES, data=model1)
+```
+
+
+
+```{r}
+summary(multiple.regression)
+```
+
+
+```{r}
+plot(multiple.regression)
+```
+
+
+
+
+```{r}
+tail(bike_split_time)
+```
+
+
+
+```{r}
+ggside <- bike_split_time[,c(1,4,5,6,7,9,10,11,12)]
+tail(ggside)
+```
+
+
+
+
+
+
+
+```{r}
+head(model1)
+```
+
+
+```{r}
+model2 <-model1
+```
+
+
+```{r}
+model2$BIKE.STANDS <- as.factor(model2$BIKE.STANDS)
+```
+
+
+```{r}
+model2$AVAILABLE.BIKE.STANDS <- as.factor(model2$AVAILABLE.BIKE.STANDS)
+```
+
+```{r}
+model2$AVAILABLE.BIKES <- as.factor(model2$AVAILABLE.BIKES)
+```
+
+
+
+
+```{r}
+head(model2)
+```
+
+
+##Logistic regression
+
+###glm() is a function that perform Generalized Linear Models
+###Firstly we store the output in new dataframe "logistic", than we need use formula syntax (BIKE.STANDS ~ AVAILABLE.BIKES) to specify that we want use AVAILABLE.BIKES to predict free BIKE.STANDS. Next use dataframe model2, and also we specify to use "binomial" family. It will make glm() function do Logistic Regression.
+```{r}
+logistic <- glm(BIKE.STANDS ~ AVAILABLE.BIKES, data = model2, family = "binomial")
+```
+
+####Using "summary" function we will get details about the logistic regression
+First line of the output has original call to the glm() function. Next line wit Deviance Residuals gives us a summary of it. They are close to 0 and roughly symmetrical. Next lines are about Coefficients. They correspondent to the model: -Intercept + AVAILABLE.BIKES x 1 . 
+"Std. Error" "z value" shows us how Wald's test was computed."Pr(>|z|)" - this a the p-values. They are both statistically significant. In a "Dispersion parameter" is used for logistic regression. Then we have Null Deviance and the Residual Deviance. We can use them to compare models. Next we do have "AIC" - Akaike Information Criterion - residual deviance (number of parameters in a model). In the last line we do have Number of Fisher Scoring Iterations. It tells us how quickly glm() converged on the maximum estimate for the coefficients. 
+```{r}
+summary(logistic)
+```
+When I run that chunk of code got an memory issue error which says that - cannot allocate vector of size 3.1 Gb
+```{r}
+# logistic <- glm(formula = BIKE.STANDS ~ ., data = model2, family = "binomial")
+```
+
+As previous chunk of code won't work I can't use that chunk of code
+```{r}
+# summary(logistic)
+```
+
+To calculate McFadden's Pseudo R2, pull the log-likehood of the null model from logistic variable and divide by -2.
+```{r}
+ll.null <- logistic$null.deviance/-2
+```
+
+Pull the log-likehood model from logistic variable for residual deviance and divide by -2.
+```{r}
+ll.proposed <- logistic$deviance/-2
+```
+
+Pseudo R2 = 0.06 - overall effect size
+```{r}
+(ll.null - ll.proposed)/ ll.null
+```
+
+
+####Another option to do Logistic Regression
+
+```{r}
+head(bike_copy)
+```
+
+
+
+
+```{r}
+model3 = bike_copy[, 4:6]
+model3$AVAILABLE.BIKES <- model3$AVAILABLE.BIKES/ max(model3$AVAILABLE.BIKES)
+```
+
+```{r}
+head(model3)
+```
+
+
+
+
+### Splitting the dataset into the Training set and Test set
+```{r}
+library(caTools)
+set.seed(123)
+split = sample.split(model3$AVAILABLE.BIKE.STANDS, SplitRatio = 0.8)
+training_set = subset(model3, split == TRUE)
+test_set = subset(model3, split == FALSE)
+```
+
+
+
+# Feature Scaling
+
+```{r}
+training_set[, 1:2] = scale(training_set[, 1:2])
+test_set[, 1:2] = scale(test_set[, 1:2])
+```
+
+
+
+
+
+
+
+# Fitting Logistic Regression to the Training set
+```{r}
+classifier = glm(formula = AVAILABLE.BIKES ~ .,
+                 family = binomial,
+                 data = training_set)
+```
+
+
+# Predicting the Test set results
+```{r}
+prob_pred = predict(classifier, type = 'response', newdata = test_set[-3])
+```
+
+
+
+```{r}
+y_pred = ifelse(prob_pred > 0.5, 1, 0)
+```
+
+
+### Making the Confusion Matrix
+```{r}
+cm = table(test_set[, 3], y_pred)
+```
+
+
+# Visualising the Training set results
+```{r}
+library(ElemStatLearn)
+```
+
+
+```{r}
+set = training_set
+X1 = seq(min(set[, 1]) - 1, max(set[, 1]) + 1, by = 0.01)
+X2 = seq(min(set[, 2]) - 1, max(set[, 2]) + 1, by = 0.01)
+grid_set = expand.grid(X1, X2)
+colnames(grid_set) = c('BIKE.STANDS', 'AVAILABLE.BIKE.STANDS')
+prob_set = predict(classifier, type = 'response', newdata = grid_set)
+y_grid = ifelse(prob_set > 0.5, 1, 0)
+plot(set[, -3],
+     main = 'Logistic Regression (Training set)',
+     xlab = 'BIKE STANDS', ylab = 'AVAILABLE BIKE STANDS',
+     xlim = range(X1), ylim = range(X2))
+contour(X1, X2, matrix(as.numeric(y_grid), length(X1), length(X2)), add = TRUE)
+points(grid_set, pch = '.', col = ifelse(y_grid == 1, 'springgreen3', 'tomato'))
+points(set, pch = 21, bg = ifelse(set[, 3] == 1, 'green4', 'red3'))
+```
+
+
+# Visualising the Test set results
+
+```{r}
+library(ElemStatLearn)
+set = test_set
+X1 = seq(min(set[, 1]) - 1, max(set[, 1]) + 1, by = 0.01)
+X2 = seq(min(set[, 2]) - 1, max(set[, 2]) + 1, by = 0.01)
+grid_set = expand.grid(X1, X2)
+colnames(grid_set) = c('BIKE.STANDS', 'AVAILABLE.BIKE.STANDS')
+prob_set = predict(classifier, type = 'response', newdata = grid_set)
+y_grid = ifelse(prob_set > 0.5, 1, 0)
+plot(set[, -3],
+     main = 'Logistic Regression (Test set)',
+     xlab = 'BIKE STANDS', ylab = 'AVAILABLE BIKE STANDS',
+     xlim = range(X1), ylim = range(X2))
+contour(X1, X2, matrix(as.numeric(y_grid), length(X1), length(X2)), add = TRUE)
+points(grid_set, pch = '.', col = ifelse(y_grid == 1, 'springgreen3', 'tomato'))
+points(set, pch = 21, bg = ifelse(set[, 3] == 1, 'green4', 'red3'))
+```
+
+
+
+
+
+
+
+
+#Conclusions
+
+I would like to put my thoughts at the end of my paper. The Dublin Bikes dataset is a good choice to carry out further analysis such as for example to compare which sections in Dublin were most used by cyclists using the Latitude and Longtitude columns (for location) on the basis of Available Bikes (how many are available), to see which Bike.Stands were most chosen by using the Time column. I could use an analysis using the Anova algorithm to compare two or three columns. One of the drawbacks that prevented me from doing a more efficient, faster and more extensive analysis was the resources of my computer. The computing power was several times insufficient especially for plotting as I was informed that the memory was insufficient. The most frequent was : "cannot allocate vector of size ....Gb" or " could not allocate memory". This was also due to the number of observations (more than 5 million), so I could not use the whole dataset as intended (from 1 January 2020 to 1 January 2021).In the end when I managed to run the file and it executed to the end I was not able to make a knit to Word. After execution of most of the chunk of code, an error was displayed about the lack of memory, which was caused by the number of plots. I had to close some of them to get the file to Word. Another option I considered was to download the data via the API, but this also did not work, because the data on the page from which I have the dataset does not give the possibility of downloading, although it is indicated that they are API. By downloading the data through the API we would have the possibility to update our data all the time and therefore extend the analysis by each day in real time. 
+Update regarding my knit document: I had an error on Line 748 (cannot allocate vector of size 3.1GB) and I had to restart my laptop.
+For references I have used a variety of sources, most often video books, but quite often I have also used tutorials and material that we have worked on during lectures.
+# References
+
+https://www.youtube.com/watch?v=PE2rGiCeCKk
+https://stat.gov.pl/cps/rde/xbcr/rzesz/ASSETS_skrypt.pdf
+https://www.naukowiec.org/wiedza/statystyka/regresja-logistyczna_466.html
+https://www.guru99.com/r-factor-categorical-continuous.html
+https://www.merriam-webster.com/dictionary/statistics
+https://www.r-graph-gallery.com/
+https://ourcodingclub.github.io/tutorials/seecc_1/
+https://www.youtube.com/watch?v=uojdfPZZBUE
+
+
+

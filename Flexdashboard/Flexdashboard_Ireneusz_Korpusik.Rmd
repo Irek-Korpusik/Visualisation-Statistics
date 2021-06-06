@@ -1,0 +1,514 @@
+---
+title: "Spending of the budgets of Poland's municipalities on education and upbringing in 2016"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+    theme: yeti
+    navbar:
+      - {
+       title: "Dashboard", href: "https://github.com/Irek-Korpusik"
+       }
+       
+    source_code: embed
+    
+#runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(knitr)
+library(ggplot2)
+library(scales)
+library(psych)
+library(dplyr)
+library(car)
+library(readr)
+library(lubridate)
+library(tidyverse)
+library(plotly)
+library(DT)
+library(highcharter)
+library(tidyr)
+library(treemap)
+
+# options(shiny.sanitize.errors = FALSE)
+```
+
+
+Dataset {data-navmenu="Home"}
+=====================================
+
+ 
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+
+
+
+```{r}
+# reading the data
+dane <- read.csv2("dane.csv")
+
+ 
+DT::datatable(dane, rownames = FALSE,
+              class = ('cell-border stripe'),
+              filter = 'top',
+  extensions = 'Buttons', options = 
+    list(pageLength = 8, lengthMenu = c(5, 10, 15, 20),
+    dom = 'Bfrtip', autoWidth = FALSE,
+    buttons = c('copy', 'csv', 'excel', 'pdf', 'print')))
+```
+
+
+
+
+```{r}
+str(dane)
+```
+
+
+
+### Number of rows
+
+```{r}
+valueBox(length(dane$voivodeship),
+         icon = "fa-bars",
+         color = "orange")
+```
+
+Row {data-width=400}
+-----------------------------------------------------------------------
+
+### Average of the income
+
+```{r}
+avg_income <- round(mean(dane$income),0)
+valueBox(avg_income,
+         icon = "glyphicon-circle-arrow-up",
+         color = "yellow")
+```
+
+
+### Average of the expenses
+
+```{r}
+avg_expenses <- round(mean(dane$expenses..),0)
+
+valueBox(avg_expenses,
+         icon = "glyphicon-circle-arrow-down",
+         color = "olive")
+```
+
+Row {data-width=400}
+-----------------------------------------------------------------------
+
+### Average of the income in a gauge format
+
+```{r}
+gauge(round(mean(dane$income, na.rm = TRUE),0),
+      min = min(dane$income),
+      max = max(dane$income),
+      symbol = "%",
+      gaugeSectors(
+          success = c(80,100),
+          warning = c(40,79),
+          danger = c(0,39)
+      ))
+```
+
+### Average of the expenses in a gauge format
+
+```{r}
+gauge(round(mean(dane$expenses.., na.rm = TRUE),0),
+      min = min(dane$expenses..),
+      max = max(dane$expenses..),
+      symbol = "%",
+      gaugeSectors(
+          success = c(80,100),
+          warning = c(40,79),
+          danger = c(0,39)
+      ))
+```
+
+
+Map of Poland {data-navmenu="Home"}
+=====================================
+
+    
+```{r}
+map_pl <- get_data_from_map(download_map_data("https://code.highcharts.com/mapdata/countries/pl/pl-all.js"))
+```
+```{r}
+state <- map_pl %>%
+  select(`hc-a2`) %>%
+  arrange(`hc-a2`)
+```
+
+```{r}
+hcmap("https://code.highcharts.com/mapdata/countries/pl/pl-all.js",
+      joinBy = c("hc-a2","State"),
+      name = "Map of Poland",
+      dataLabels= list(enabled = TRUE, format= '{point.name}'),
+      borderColor = "#000000", borderWidth  = 0.1,
+      color = "green",
+      tooltip = list(valueDecimals = 0))
+```
+
+
+
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+Introduction {data-navmenu="Home"}
+=====================================
+Education is one of the most important tasks of the state, to which considerable public funds are allocated every year. It is an area where it is certainly not worth saving, because the level of prosperity in society depends on the way and quality of education.
+The subject of this study is the per capita expenditure of the budgets of Polish municipalities in 2016 on education and upbringing. In addition, we use information about the income of the budgets of these municipalities, including per capita. The choice of municipalities has been limited to the Małopolskie and Mazowieckie voivodeships only.
+
+Dataset {data-navmenu="Home"}
+=====================================
+
+The data comes from the website of the Central Statistical Office (GUS) (www.stat.gov.pl), from the Local Data Bank section, respectively:
+•	category: Public finances, group: Revenue from the budgets of municipalities and cities with district rights, subgroup: Revenue per capita
+•	category: Public finances, group: Expenditure of the budgets of municipalities and cities with district rights, subgroup: Expenditure per capita
+
+
+Research Question {data-navmenu="Home"}
+=====================================
+
+•	what was the income of municipal budgets in 2016 and the amount of their expenses on education?
+•	did the distribution of expenses vary depending on the province or type of municipality under consideration?
+•	did average expenses differ significantly between urban, urban-rural and rural municipalities?
+•	was there a significant relationship between income and spending?
+
+
+About Me {data-navmenu="Home"}
+=====================================
+
+Ireneusz Korpusik
+
+I'm a part-time MSc student in IT Carlow. The program code is: CW_SRDAT_M Y5 and a teacher name is: Agnes Maciocha.
+Project was done in RStudio program with Flexdashboard package. 
+
+
+
+Page 1
+==================================================
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Frequency table
+
+```{r}
+# auxiliary data frame for the variable Voivodeship
+x <- dane$voivodeship
+tab1 <- as.data.frame(addmargins(table(x), FUN = sum)) # counts n
+tab1$pr <- round(as.numeric(addmargins(100*prop.table(table(x)), FUN = sum)), 2) # percentage %
+tab1$ods <- as.numeric(addmargins(prop.table(table(x)), FUN = sum)) # interest rate
+
+# frequency table to be displayed (without interest rate)
+kable(tab1[,1:3], col.names = c("Voivodeship", "n", "%"))
+```
+### HighCharter Treemap of Mazowieckie and Malopolskie
+
+```{r}
+dane%>%
+  group_by(voivodeship)%>%
+  summarise(avg_income= round(mean(income, na.rm = TRUE),0)) %>%
+  hchart(type = "treemap",
+         hcaes(x=voivodeship, value = avg_income, color = avg_income))
+```
+
+
+
+
+
+
+
+Column {data-width=400}
+-----------------------------------------------------------------------
+
+### Qualitative characteristic 
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+# data frame for the chart (without the sum row)
+tab2 <- tab1[-nrow(tab1),]
+# pie chart
+ggplot(tab2, aes(x = "", y = ods, fill = x)) + 
+  geom_col(width = 1, colour = "black") + 
+  geom_text(aes(y = ods,  label = paste0(pr,"%")), size = 5, fontface = "bold", 
+            position = position_stack(vjust = 0.5))  +	  
+  scale_y_continuous(labels = scales::percent_format()) + 
+  coord_polar(theta = "y") + 
+  labs(fill = "Voivodeship: ") + 
+  theme(legend.position = "bottom", legend.text = element_text(colour = "black", size = 12), 
+        axis.title.x = element_blank(), axis.title.y = element_blank(), 
+        axis.text.y = element_blank(), axis.ticks = element_blank())
+
+```
+
+### Type of municipality
+
+```{r}
+# auxiliary data frame for the Type of municipality variable
+x <- dane$municipality
+tab3 <- as.data.frame(addmargins(table(x), FUN = sum)) # counts n
+tab3$pr <- round(as.numeric(addmargins(100*prop.table(table(x)), FUN = sum)), 2) # percentage %
+tab3$ods <- as.numeric(addmargins(prop.table(table(x)), FUN = sum)) # interest rate
+
+# frequency table to be displayed (without interest rate)
+kable(tab3[,1:3], col.names = c("Type of municipality", "n", "%"))
+```
+Page 2
+==================================================
+
+Column {data-width=550}
+-----------------------------------------------------------------------
+### Bar chart of distinction
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+# data frame for the chart (without the sum row)
+tab4 <- tab3[-nrow(tab3),]
+
+
+
+# bar chart
+ggplot(tab4, aes(x = x, y = pr)) + 
+  geom_col(fill = "#FFFF99" , colour = "black") +
+  geom_text(aes(label = paste0(pr,"%")), stat = "identity", size = 5, 
+            fontface = "bold", position = position_stack(vjust = 0.5)) +
+  scale_x_discrete(labels = wrap_format(25)) +
+  ylim(NA, 1.2*max(tab4$pr)) +
+  theme(axis.title.x = element_blank(), axis.text.x = element_text(colour = "black", size = 12)) +
+  labs(y = "percentage")
+```
+Column {data-width=450}
+-----------------------------------------------------------------------
+
+### Budget revenue
+```{r}
+kable(describe(dane$income, quant = c(0.25, 0.75))[c(3:5,8:12,14:15)], digits = 2)
+```
+
+
+
+Column 
+-----------------------------------------------------------------------
+
+### Chart C
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(dane, aes(x = income)) + 
+  geom_histogram(breaks=seq(2000, 5500, by = 500), colour = "black", fill = "#FFFF99") +
+  labs(x = "Income in PLN", y = "Number of observations") +
+  scale_x_continuous(breaks = seq(2000, 5500, by = 500))
+```
+
+
+
+
+
+
+Page 3
+==================================================
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Mean of income
+
+
+```{r}
+t.test(dane$income, alternative = "two.sided", mu = 3000, conf.level = 0.95)
+```
+Column {data-width=350}
+-----------------------------------------------------------------------
+
+### Budget expenses for education
+
+```{r}
+kable(describe(dane$expenses, quant = c(0.25, 0.75))[c(3:5,8:12,14:15)], digits = 2)
+```
+
+### Chart c
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(dane, aes(x = expenses.. )) + 
+  geom_histogram(breaks=seq(600, 1700, by = 100), colour = "black", fill = "#FFFF99") +
+  labs(x = "Expenses in PLN", y = "Number of observations") +
+  scale_x_continuous(breaks = seq(600, 1700, by = 100))
+```
+
+Page 4
+==================================================
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r}
+t.test(dane$expenses.., alternative = "two.sided", mu = 1000, conf.level = 0.95)
+```
+
+### Comparison of distributions
+
+```{r}
+tab5 <- dane %>%
+  group_by(voivodeship) %>%
+  summarise(mean = mean(expenses..), 
+            sd = sd(expenses..), 
+            median = median(expenses..), 
+            min = min(expenses..), 
+            max = max(expenses..),
+            skew = skew(expenses..),
+            kurtosis = kurtosi(expenses..),
+            Q1 = quantile(expenses.., 0.25),
+            Q3 = quantile(expenses.., 0.75))
+kable(tab5, digits = 2)
+```
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+
+### Chart C
+
+```{r fig.width = 7, fig.height = 7, fig.align = "center"}
+ggplot(dane, aes(x = expenses..)) + 
+  geom_histogram(breaks=seq(600, 1700, by = 100), colour = "black", fill = "#FFFF99") +
+  facet_grid(voivodeship ~ .) +
+  labs(x = "Expenses in PLN", y = "Number of observations") +
+  scale_x_continuous(breaks = seq(600, 1700, by = 100))
+```
+
+Page 5
+==================================================
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Divison by type of municipality
+
+```{r}
+tab6 <- dane %>%
+  group_by(municipality) %>%
+  summarise(mean = mean(expenses..), 
+            sd = sd(expenses..), 
+            median = median(expenses..), 
+            min = min(expenses..), 
+            max = max(expenses..),
+            skew = skew(expenses..),
+            kurtosis = kurtosi(expenses..),
+            Q1 = quantile(expenses.., 0.25),
+            Q3 = quantile(expenses.., 0.75)) %>% as.data.frame
+kable(tab6, digits = 2)
+```
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r fig.width = 7, fig.height = 7, fig.align = "center"}
+ggplot(dane, aes(x = expenses..)) + 
+  geom_histogram(breaks=seq(600, 1700, by = 100), colour = "black", fill = "#FFFF99") +
+  facet_grid(municipality ~ .) +
+  labs(x = "Expenses in PLN", y = "Number of observations") +
+  scale_x_continuous(breaks = seq(600, 1700, by = 100))
+
+```
+
+
+Page 6
+==================================================
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+##### Analysis of variance
+
+```{r}
+leveneTest(dane$expenses.. ~ dane$municipality)
+```
+
+##### Chart B
+
+```{r}
+model <- aov(expenses.. ~ municipality, data = dane)
+summary(model)
+```
+
+##### Chart C
+
+```{r}
+pairwise.t.test(dane$expenses.., dane$municipality, p.adj = "none")
+```
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+
+### Chart D
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(tab6, aes(x = municipality, y = mean)) + 
+  geom_col(fill = "#FFFF99" , colour = "black") +
+  geom_text(aes(label = round(mean, 2)), size = 5, fontface = "bold", 
+            position = position_stack(vjust = 0.5)) +
+  scale_x_discrete(labels = wrap_format(25)) +
+  ylim(NA, 1.2*max(tab6$mean)) +
+  theme(axis.title.x = element_blank(), axis.text.x = element_text(colour = "black", size = 12)) +
+  labs(y = "average")
+```
+
+
+Page 7
+==================================================
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Chart A
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+ggplot(dane, aes(x = income, y = expenses.., color=expenses..)) + 
+  geom_point() + 
+  scale_y_continuous(expand = c(0.01, 0)) + 
+  xlab("Income") + 
+  ylab("Expenses")
+
+```
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+### Chart B
+
+```{r fig.width = 5, fig.height = 5, fig.align = "center"}
+# removing the observation from the outlier
+dane3 <- dane[dane$income<5000,]
+
+# scatter plot
+ggplot(dane3, aes(x = income, y = expenses.., color=income)) + 
+  geom_point() + 
+  stat_smooth(method = "lm", se = FALSE) + 
+  scale_y_continuous(expand = c(0.01, 0)) + 
+  xlab("Income") + 
+  ylab("Expenses")
+  
+
+  
+```
+
+### Chart C
+
+```{r}
+cor(dane3$income, dane3$expenses..)
+```
+```{r}
+model2 <- lm(expenses.. ~ income, data = dane3) 
+summary(model2)
+```
+
